@@ -1,1 +1,1 @@
-gcc -o launch launch.cpp -lSDL2 -lSDL2main -m32 -mwindows
+gcc -o launch launch.cpp -lSDL2 -lSDL2main -lSDL2_image -m32 -mwindows
