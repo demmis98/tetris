@@ -8,3 +8,6 @@ rotar pieza en sentido horario:
   
 rotar pieza en sentido antihorario:
   -z
+
+resetear:
+  -r
