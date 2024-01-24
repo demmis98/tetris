@@ -1,6 +1,5 @@
 #define SDL_MAIN_HANDLED
 #include "SDL2/SDL.h"
-#include "SDL2/SDL_image.h"
 #include <chrono>
 
 #include <stdio.h>
@@ -11,9 +10,8 @@
 #define WORLD_WIDTH 10
 #define WORLD_HEIGHT 18
 
-#define LINES_PER_LEVEL 10
 #define PIECE_MAX_SIZE 4
-#define PIECE_VARIATIONS 7
+#define PIECE_VARIATIONS 6
 
 
 void init(int *world, int *level, int *lines, int *timer, char *rand, bool *dead);
@@ -27,8 +25,6 @@ void updatePiece(int piece_rotation, int piece_type, bool (*piece)[PIECE_MAX_SIZ
 bool collition(int piece_x, int piece_y, bool piece[PIECE_MAX_SIZE][PIECE_MAX_SIZE], int world[WORLD_HEIGHT][WORLD_WIDTH]);
 void setPiece(bool piece[PIECE_MAX_SIZE][PIECE_MAX_SIZE], int (*world)[WORLD_HEIGHT][WORLD_WIDTH], int piece_x, int piece_y, int piece_color, bool *dead, int *level, int *lines);
 
-void renderNumber(SDL_Renderer *renderer, SDL_Texture *font, int num, int x, int y);
-
 
 int main(){
   bool running;
@@ -37,10 +33,10 @@ int main(){
   SDL_Init(SDL_INIT_EVERYTHING);
   SDL_Window *window = SDL_CreateWindow("tetrominoes", 64, 64, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
   SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
-  SDL_Texture *font = IMG_LoadTexture(renderer, "font.png");
+
 
   int world[WORLD_HEIGHT][WORLD_WIDTH];
-  int off_x = 64;
+  int off_x = 128;
   int off_y = 32;
 
   char rand = SDL_GetTicks() * 7;
@@ -208,32 +204,6 @@ int main(){
       {0, 1, 1, 0},
       {0, 1, 0, 0}
       }
-    },
-    {
-      {
-      {0, 0, 0, 0},
-      {0, 0, 0, 0}, //T
-      {0, 1, 1, 1},
-      {0, 0, 1, 0}
-      },
-      {
-      {0, 0, 0, 0},
-      {0, 0, 1, 0}, //T
-      {0, 1, 1, 0},
-      {0, 0, 1, 0}
-      },
-      {
-      {0, 0, 0, 0},
-      {0, 0, 1, 0}, //T
-      {0, 1, 1, 1},
-      {0, 0, 0, 0}
-      },
-      {
-      {0, 0, 0, 0},
-      {0, 0, 1, 0}, //T
-      {0, 0, 1, 1},
-      {0, 0, 1, 0}
-      }
     }
   };
 
@@ -286,6 +256,11 @@ int main(){
               if(collition(piece_x, piece_y, piece, world))
                 rotateRight(&piece_rotation, piece_type, &piece, pieces);
             break;
+            case SDLK_x:
+              rotateRight(&piece_rotation, piece_type, &piece, pieces);
+              if(collition(piece_x, piece_y, piece, world))
+                rotateLeft(&piece_rotation, piece_type, &piece, pieces);
+            break;
 
             /*
             case SDLK_a:
@@ -305,7 +280,7 @@ int main(){
     if(time_new - time_old > 1000/60){
       if(!dead){
         timer++;
-        if((timer == 60 - level && level < 60) || level >= 60){
+        if(timer == level){
           piece_y++;
           if(collition(piece_x, piece_y, piece, world)){
             piece_y--;
@@ -392,8 +367,6 @@ int main(){
           SDL_RenderFillRect(renderer, &temp_rect);
         }
       }
-    renderNumber(renderer, font, level, off_x + (WORLD_WIDTH + 13) * BLOCK_SIDE, off_y);
-    renderNumber(renderer, font, (level * BLOCK_SIDE) + lines, off_x + (WORLD_WIDTH + 13) * BLOCK_SIDE, off_y + (WORLD_HEIGHT * 2));
 
     SDL_RenderPresent(renderer);
   }
@@ -408,7 +381,7 @@ void init(int *world, int *level, int *lines, int *timer, char *rand, bool *dead
     for(int i = 0; i < WORLD_WIDTH; i++)
       *(world + i + (j * WORLD_WIDTH)) = 0;
 
-  *level = 0;
+  *level = 60;
   *lines = 0;
   *timer = 0;
 
@@ -426,7 +399,6 @@ void random(char *rand){
 
 void newPiece(int *piece_x, int *piece_y, int *piece_color, int *piece_rotation, int *piece_type, char *rand){
   *piece_x = WORLD_WIDTH / 2;
-  *piece_x -= PIECE_MAX_SIZE / 2;
   *piece_y = 0;
   *piece_rotation = 0;
   random(rand);
@@ -515,35 +487,11 @@ void setPiece(bool piece[PIECE_MAX_SIZE][PIECE_MAX_SIZE], int (*world)[WORLD_HEI
           (*world)[w][i] = (*world)[w - 1][i];
       
       *lines += 1;
-      if(*lines == LINES_PER_LEVEL){
-        *level += 1;
+      if(*lines == 10){
+        if(*level != 1)
+          *level -= 1;
         *lines = 0;
       }
     }
   }
-}
-
-
-void renderNumber(SDL_Renderer *renderer, SDL_Texture *font, int num, int x, int y){
-  int temp_x = x;
-  SDL_Rect source;
-  source.w = BLOCK_SIDE;
-  source.h = BLOCK_SIDE;
-  SDL_Rect destiny = source;
-  destiny.y = y;
-  do{
-    source.x = num % 5;
-    source.y = num % 10;
-    source.y /= 5;
-    source.x *= BLOCK_SIDE;
-    source.y *= BLOCK_SIDE;
-
-    destiny.x = temp_x;
-
-    SDL_RenderCopy(renderer, font, &source, &destiny);
-
-    num /= 10;
-    temp_x -= BLOCK_SIDE;
-  }
-  while(num != 0);
 }
