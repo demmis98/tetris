@@ -302,9 +302,9 @@ int main(){
                   piece_y--;
                   setPiece(piece, &world, piece_x, piece_y, piece_color, &level, &lines);
                   newPiece(&piece_x, &piece_y, &piece_color, &piece_rotation, &piece_type, &rand);
+                  updatePiece(piece_rotation, piece_type, &piece, pieces);
                   if(collition(piece_x, piece_y, piece, world))
                     dead = true;
-                  updatePiece(piece_rotation, piece_type, &piece, pieces);
                 }
               }
               break;
