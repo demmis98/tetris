@@ -1,6 +1,7 @@
 #define SDL_MAIN_HANDLED
 #include "SDL2/SDL.h"
 #include "SDL2/SDL_image.h"
+#include "SDL2/SDL_audio.h"
 #include <chrono>
 
 #include <stdio.h>
@@ -8,12 +9,13 @@
 #define SCREEN_WIDTH 480
 #define SCREEN_HEIGHT 368
 #define BLOCK_SIDE 16
-#define WORLD_WIDTH 12
+#define WORLD_WIDTH 10
 #define WORLD_HEIGHT 18
 
 #define LINES_PER_LEVEL 10
-#define PIECE_MAX_SIZE 5
-#define PIECE_VARIATIONS 18
+#define PIECE_MAX_SIZE 4
+#define PIECE_VARIATIONS 7
+#define COLOR_VARIATIONS 16
 
 
 void init(int *world, int *level, int *lines, int *timer, char *rand, bool *dead);
@@ -25,9 +27,10 @@ void rotateRight(int *piece_rotation, int piece_type, bool (*piece)[PIECE_MAX_SI
   , const bool pieces[PIECE_VARIATIONS][4][PIECE_MAX_SIZE][PIECE_MAX_SIZE]);
 void updatePiece(int piece_rotation, int piece_type, bool (*piece)[PIECE_MAX_SIZE][PIECE_MAX_SIZE], const bool pieces[PIECE_VARIATIONS][4][PIECE_MAX_SIZE][PIECE_MAX_SIZE]);
 bool collition(int piece_x, int piece_y, bool piece[PIECE_MAX_SIZE][PIECE_MAX_SIZE], int world[WORLD_HEIGHT][WORLD_WIDTH]);
-void setPiece(bool piece[PIECE_MAX_SIZE][PIECE_MAX_SIZE], int (*world)[WORLD_HEIGHT][WORLD_WIDTH], int piece_x, int piece_y, int piece_color, bool *dead, int *level, int *lines);
+void setPiece(bool piece[PIECE_MAX_SIZE][PIECE_MAX_SIZE], int (*world)[WORLD_HEIGHT][WORLD_WIDTH], int piece_x, int piece_y, int piece_color, int *level, int *lines);
 
 void renderNumber(SDL_Renderer *renderer, SDL_Texture *font, int num, int x, int y);
+void setColor(SDL_Renderer *renderer, int id);
 
 
 int main(){
@@ -35,12 +38,23 @@ int main(){
 
   //open window
   SDL_Init(SDL_INIT_EVERYTHING);
-  SDL_Window *window = SDL_CreateWindow("pentominoes", 64, 64, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
+  SDL_Window *window = SDL_CreateWindow("tetrominoes", 64, 64, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
   SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
   SDL_Texture *font = IMG_LoadTexture(renderer, "font.png");
 
   SDL_Surface *icon = IMG_Load("icon.ico");
   SDL_SetWindowIcon(window, icon);
+
+
+  SDL_AudioSpec wavSpec;
+  Uint32 wavLength;
+  Uint8 *wavBuffer;
+  SDL_LoadWAV("music.wav", &wavSpec, &wavBuffer, &wavLength);
+
+  SDL_AudioDeviceID deviceId = SDL_OpenAudioDevice(NULL, 0, &wavSpec, NULL, 0);
+  SDL_ClearQueuedAudio(deviceId);
+  SDL_PauseAudioDevice(deviceId, 0);
+  SDL_QueueAudio(deviceId, wavBuffer, wavLength);
 
   int world[WORLD_HEIGHT][WORLD_WIDTH];
   int off_x = 64;
@@ -50,7 +64,7 @@ int main(){
 
   int piece_x, piece_y, piece_color, piece_rotation, piece_type;
   int level, lines, timer;
-  bool dead;
+  bool dead, mute = false;
 
   bool piece[PIECE_MAX_SIZE][PIECE_MAX_SIZE];
 
@@ -58,542 +72,184 @@ int main(){
   const bool pieces[PIECE_VARIATIONS][4][PIECE_MAX_SIZE][PIECE_MAX_SIZE] = {
     {
       {
-      {0, 0, 1, 0, 0}, //i
-      {0, 0, 1, 0, 0},
-      {0, 0, 1, 0, 0},
-      {0, 0, 1, 0, 0},
-      {0, 0, 1, 0, 0}
+      {0, 0, 1, 0}, //line
+      {0, 0, 1, 0},
+      {0, 0, 1, 0},
+      {0, 0, 1, 0}
       },
       {
-      {0, 0, 0, 0, 0}, //i
-      {0, 0, 0, 0, 0},
-      {1, 1, 1, 1, 1},
-      {0, 0, 0, 0, 0},
-      {0, 0, 0, 0, 0}
+      {0, 0, 0, 0}, //line
+      {0, 0, 0, 0},
+      {1, 1, 1, 1},
+      {0, 0, 0, 0}
       },
       {
-      {0, 0, 1, 0, 0}, //i
-      {0, 0, 1, 0, 0},
-      {0, 0, 1, 0, 0},
-      {0, 0, 1, 0, 0},
-      {0, 0, 1, 0, 0}
+      {0, 0, 1, 0}, //line
+      {0, 0, 1, 0},
+      {0, 0, 1, 0},
+      {0, 0, 1, 0}
       },
       {
-      {0, 0, 0, 0, 0}, //i
-      {0, 0, 0, 0, 0},
-      {1, 1, 1, 1, 1},
-      {0, 0, 0, 0, 0},
-      {0, 0, 0, 0, 0}
+      {0, 0, 0, 0}, //line
+      {0, 0, 0, 0},
+      {1, 1, 1, 1},
+      {0, 0, 0, 0}
       }
     },
     {
       {
-      {0, 0, 0, 0, 0}, //F
-      {0, 0, 1, 1, 0},
-      {0, 1, 1, 0, 0},
-      {0, 0, 1, 0, 0},
-      {0, 0, 0, 0, 0}
+      {0, 0, 0, 0}, //square
+      {0, 1, 1, 0},
+      {0, 1, 1, 0},
+      {0, 0, 0, 0}
       },
       {
-      {0, 0, 0, 0, 0}, //F
-      {0, 0, 1, 0, 0},
-      {0, 1, 1, 1, 0},
-      {0, 0, 0, 1, 0},
-      {0, 0, 0, 0, 0}
+      {0, 0, 0, 0}, //square
+      {0, 1, 1, 0},
+      {0, 1, 1, 0},
+      {0, 0, 0, 0}
       },
       {
-      {0, 0, 0, 0, 0}, //F
-      {0, 0, 1, 0, 0},
-      {0, 0, 1, 1, 0},
-      {0, 1, 1, 0, 0},
-      {0, 0, 0, 0, 0}
+      {0, 0, 0, 0}, //square
+      {0, 1, 1, 0},
+      {0, 1, 1, 0},
+      {0, 0, 0, 0}
       },
       {
-      {0, 0, 0, 0, 0}, //F
-      {0, 1, 0, 0, 0},
-      {0, 1, 1, 1, 0},
-      {0, 0, 1, 0, 0},
-      {0, 0, 0, 0, 0}
+      {0, 0, 0, 0}, //square
+      {0, 1, 1, 0},
+      {0, 1, 1, 0},
+      {0, 0, 0, 0}
       }
     },
     {
       {
-      {0, 0, 0, 0, 0}, //reverse F
-      {0, 1, 1, 0, 0},
-      {0, 0, 1, 1, 0},
-      {0, 0, 1, 0, 0},
-      {0, 0, 0, 0, 0}
+      {0, 0, 0, 0}, //reverse L
+      {0, 1, 1, 0},
+      {0, 1, 0, 0},
+      {0, 1, 0, 0}
       },
       {
-      {0, 0, 0, 0, 0}, //reverse F
-      {0, 0, 0, 1, 0},
-      {0, 1, 1, 1, 0},
-      {0, 0, 1, 0, 0},
-      {0, 0, 0, 0, 0}
+      {0, 0, 0, 0}, //reverse L
+      {1, 1, 1, 0},
+      {0, 0, 1, 0},
+      {0, 0, 0, 0}
       },
       {
-      {0, 0, 0, 0, 0}, //reverse F
-      {0, 0, 1, 0, 0},
-      {0, 1, 1, 0, 0},
-      {0, 0, 1, 1, 0},
-      {0, 0, 0, 0, 0}
+      {0, 0, 1, 0}, //reverse L
+      {0, 0, 1, 0},
+      {0, 1, 1, 0},
+      {0, 0, 0, 0}
       },
       {
-      {0, 0, 0, 0, 0}, //reverse F
-      {0, 0, 1, 0, 0},
-      {0, 1, 1, 1, 0},
-      {0, 1, 0, 0, 0},
-      {0, 0, 0, 0, 0}
+      {0, 0, 0, 0}, //reverse L
+      {0, 1, 0, 0},
+      {0, 1, 1, 1},
+      {0, 0, 0, 0}
       }
     },
     {
       {
-      {0, 0, 0, 0, 0}, //reverse L
-      {0, 0, 0, 1, 0},
-      {0, 0, 0, 1, 0},
-      {0, 0, 0, 1, 0},
-      {0, 0, 1, 1, 0}
+      {0, 0, 0, 0}, //L
+      {0, 1, 1, 0},
+      {0, 0, 1, 0},
+      {0, 0, 1, 0}
       },
       {
-      {0, 0, 0, 0, 0}, //reverse L
-      {0, 0, 0, 0, 0},
-      {0, 1, 0, 0, 0},
-      {0, 1, 1, 1, 1},
-      {0, 0, 0, 0, 0}
+      {0, 0, 0, 0}, //L
+      {0, 0, 1, 0},
+      {1, 1, 1, 0},
+      {0, 0, 0, 0}
       },
       {
-      {0, 0, 0, 0, 0}, //reverse L
-      {0, 0, 1, 1, 0},
-      {0, 0, 1, 0, 0},
-      {0, 0, 1, 0, 0},
-      {0, 0, 1, 0, 0}
+      {0, 1, 0, 0}, //L
+      {0, 1, 0, 0},
+      {0, 1, 1, 0},
+      {0, 0, 0, 0}
       },
       {
-      {0, 0, 0, 0, 0}, //reverse L
-      {0, 0, 0, 0, 0},
-      {0, 1, 1, 1, 1},
-      {0, 0, 0, 0, 1},
-      {0, 0, 0, 0, 0}
+      {0, 0, 0, 0}, //L
+      {0, 1, 1, 1},
+      {0, 1, 0, 0},
+      {0, 0, 0, 0}
       }
     },
     {
       {
-      {0, 0, 0, 0, 0}, //L
-      {0, 0, 1, 0, 0},
-      {0, 0, 1, 0, 0},
-      {0, 0, 1, 0, 0},
-      {0, 0, 1, 1, 0}
+      {0, 0, 0, 0}, //s
+      {0, 0, 0, 0},
+      {0, 1, 1, 0},
+      {1, 1, 0, 0}
       },
       {
-      {0, 0, 0, 0, 0}, //L
-      {0, 0, 0, 0, 0},
-      {0, 1, 1, 1, 1},
-      {0, 1, 0, 0, 0},
-      {0, 0, 0, 0, 0}
+      {0, 0, 0, 0}, //s
+      {0, 1, 0, 0},
+      {0, 1, 1, 0},
+      {0, 0, 1, 0}
       },
       {
-      {0, 0, 0, 0, 0}, //L
-      {0, 0, 1, 1, 0},
-      {0, 0, 0, 1, 0},
-      {0, 0, 0, 1, 0},
-      {0, 0, 0, 1, 0}
+      {0, 0, 0, 0}, //s
+      {0, 0, 0, 0},
+      {0, 1, 1, 0},
+      {1, 1, 0, 0}
       },
       {
-      {0, 0, 0, 0, 0}, //L
-      {0, 0, 0, 0, 0},
-      {0, 0, 0, 0, 1},
-      {0, 1, 1, 1, 1},
-      {0, 0, 0, 0, 0}
+      {0, 0, 0, 0}, //s
+      {0, 1, 0, 0},
+      {0, 1, 1, 0},
+      {0, 0, 1, 0}
       }
     },
     {
       {
-      {0, 0, 0, 0, 0}, //q
-      {0, 1, 1, 0, 0},
-      {0, 1, 1, 0, 0},
-      {0, 0, 1, 0, 0},
-      {0, 0, 0, 0, 0}
+      {0, 0, 0, 0},
+      {0, 0, 0, 0}, //z
+      {0, 1, 1, 0},
+      {0, 0, 1, 1}
       },
       {
-      {0, 0, 0, 0, 0}, //q
-      {0, 0, 1, 1, 0},
-      {0, 1, 1, 1, 0},
-      {0, 0, 0, 0, 0},
-      {0, 0, 0, 0, 0}
+      {0, 0, 0, 0},
+      {0, 0, 1, 0}, //z
+      {0, 1, 1, 0},
+      {0, 1, 0, 0}
       },
       {
-      {0, 0, 0, 0, 0}, //q
-      {0, 0, 1, 0, 0},
-      {0, 0, 1, 1, 0},
-      {0, 0, 1, 1, 0},
-      {0, 0, 0, 0, 0}
+      {0, 0, 0, 0},
+      {0, 0, 0, 0}, //z
+      {0, 1, 1, 0},
+      {0, 0, 1, 1}
       },
       {
-      {0, 0, 0, 0, 0}, //q
-      {0, 0, 0, 0, 0},
-      {0, 1, 1, 1, 0},
-      {0, 1, 1, 0, 0},
-      {0, 0, 0, 0, 0}
+      {0, 0, 0, 0},
+      {0, 0, 1, 0}, //z
+      {0, 1, 1, 0},
+      {0, 1, 0, 0}
       }
     },
     {
       {
-      {0, 0, 0, 0, 0}, //p
-      {0, 0, 1, 1, 0},
-      {0, 0, 1, 1, 0},
-      {0, 0, 1, 0, 0},
-      {0, 0, 0, 0, 0}
+      {0, 0, 0, 0},
+      {0, 0, 0, 0}, //T
+      {0, 1, 1, 1},
+      {0, 0, 1, 0}
       },
       {
-      {0, 0, 0, 0, 0}, //p
-      {0, 0, 0, 0, 0},
-      {0, 1, 1, 1, 0},
-      {0, 0, 1, 1, 0},
-      {0, 0, 0, 0, 0}
+      {0, 0, 0, 0},
+      {0, 0, 1, 0}, //T
+      {0, 1, 1, 0},
+      {0, 0, 1, 0}
       },
       {
-      {0, 0, 0, 0, 0}, //p
-      {0, 0, 1, 0, 0},
-      {0, 1, 1, 0, 0},
-      {0, 1, 1, 0, 0},
-      {0, 0, 0, 0, 0}
+      {0, 0, 0, 0},
+      {0, 0, 1, 0}, //T
+      {0, 1, 1, 1},
+      {0, 0, 0, 0}
       },
       {
-      {0, 0, 0, 0, 0}, //p
-      {0, 1, 1, 0, 0},
-      {0, 1, 1, 1, 0},
-      {0, 0, 0, 0, 0},
-      {0, 0, 0, 0, 0}
-      }
-    },
-    {
-      {
-      {0, 0, 0, 0, 0}, //n
-      {0, 0, 0, 1, 0},
-      {0, 0, 1, 1, 0},
-      {0, 0, 1, 0, 0},
-      {0, 0, 1, 0, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //n
-      {0, 0, 0, 0, 0},
-      {0, 1, 1, 1, 0},
-      {0, 0, 0, 1, 1},
-      {0, 0, 0, 0, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //n
-      {0, 0, 0, 1, 0},
-      {0, 0, 0, 1, 0},
-      {0, 0, 1, 1, 0},
-      {0, 0, 1, 0, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //n
-      {0, 0, 0, 0, 0},
-      {0, 1, 1, 0, 0},
-      {0, 0, 1, 1, 1},
-      {0, 0, 0, 0, 0}
-      }
-    },
-    {
-      {
-      {0, 0, 0, 0, 0}, //reverse n
-      {0, 0, 1, 0, 0},
-      {0, 0, 1, 1, 0},
-      {0, 0, 0, 1, 0},
-      {0, 0, 0, 1, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //reverse n
-      {0, 0, 0, 0, 0},
-      {0, 0, 0, 1, 1},
-      {0, 1, 1, 1, 0},
-      {0, 0, 0, 0, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //reverse n
-      {0, 0, 1, 0, 0},
-      {0, 0, 1, 0, 0},
-      {0, 0, 1, 1, 0},
-      {0, 0, 0, 1, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //reverse n
-      {0, 0, 0, 0, 0},
-      {0, 0, 1, 1, 1},
-      {0, 1, 1, 0, 0},
-      {0, 0, 0, 0, 0}
-      }
-    },
-    {
-      {
-      {0, 0, 0, 0, 0}, //T
-      {0, 1, 1, 1, 0},
-      {0, 0, 1, 0, 0},
-      {0, 0, 1, 0, 0},
-      {0, 0, 0, 0, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //T
-      {0, 0, 0, 1, 0},
-      {0, 1, 1, 1, 0},
-      {0, 0, 0, 1, 0},
-      {0, 0, 0, 0, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //T
-      {0, 0, 1, 0, 0},
-      {0, 0, 1, 0, 0},
-      {0, 1, 1, 1, 0},
-      {0, 0, 0, 0, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //T
-      {0, 1, 0, 0, 0},
-      {0, 1, 1, 1, 0},
-      {0, 1, 0, 0, 0},
-      {0, 0, 0, 0, 0}
-      }
-    },
-    {
-      {
-      {0, 0, 0, 0, 0}, //u
-      {0, 0, 0, 0, 0},
-      {0, 1, 0, 1, 0},
-      {0, 1, 1, 1, 0},
-      {0, 0, 0, 0, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //u
-      {0, 1, 1, 0, 0},
-      {0, 1, 0, 0, 0},
-      {0, 1, 1, 0, 0},
-      {0, 0, 0, 0, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //u
-      {0, 1, 1, 1, 0},
-      {0, 1, 0, 1, 0},
-      {0, 0, 0, 0, 0},
-      {0, 0, 0, 0, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //u
-      {0, 0, 1, 1, 0},
-      {0, 0, 0, 1, 0},
-      {0, 0, 1, 1, 0},
-      {0, 0, 0, 0, 0}
-      }
-    },
-    {
-      {
-      {0, 0, 0, 0, 0}, //v
-      {0, 1, 0, 0, 0},
-      {0, 1, 0, 0, 0},
-      {0, 1, 1, 1, 0},
-      {0, 0, 0, 0, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //v
-      {0, 1, 1, 1, 0},
-      {0, 1, 0, 0, 0},
-      {0, 1, 0, 0, 0},
-      {0, 0, 0, 0, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //v
-      {0, 1, 1, 1, 0},
-      {0, 0, 0, 1, 0},
-      {0, 0, 0, 1, 0},
-      {0, 0, 0, 0, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //v
-      {0, 0, 0, 1, 0},
-      {0, 0, 0, 1, 0},
-      {0, 1, 1, 1, 0},
-      {0, 0, 0, 0, 0}
-      }
-    },
-    {
-      {
-      {0, 0, 0, 0, 0}, //w
-      {0, 0, 0, 1, 0},
-      {0, 0, 1, 1, 0},
-      {0, 1, 1, 0, 0},
-      {0, 0, 0, 0, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //w
-      {0, 1, 0, 0, 0},
-      {0, 1, 1, 0, 0},
-      {0, 0, 1, 1, 0},
-      {0, 0, 0, 0, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //w
-      {0, 0, 1, 1, 0},
-      {0, 1, 1, 0, 0},
-      {0, 1, 0, 0, 0},
-      {0, 0, 0, 0, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //w
-      {0, 1, 1, 0, 0},
-      {0, 0, 1, 1, 0},
-      {0, 0, 0, 1, 0},
-      {0, 0, 0, 0, 0}
-      }
-    },
-    {
-      {
-      {0, 0, 0, 0, 0}, //x
-      {0, 0, 1, 0, 0},
-      {0, 1, 1, 1, 0},
-      {0, 0, 1, 0, 0},
-      {0, 0, 0, 0, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //x
-      {0, 0, 1, 0, 0},
-      {0, 1, 1, 1, 0},
-      {0, 0, 1, 0, 0},
-      {0, 0, 0, 0, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //x
-      {0, 0, 1, 0, 0},
-      {0, 1, 1, 1, 0},
-      {0, 0, 1, 0, 0},
-      {0, 0, 0, 0, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //x
-      {0, 0, 1, 0, 0},
-      {0, 1, 1, 1, 0},
-      {0, 0, 1, 0, 0},
-      {0, 0, 0, 0, 0}
-      }
-    },
-    {
-      {
-      {0, 0, 0, 0, 0}, //y
-      {0, 0, 0, 1, 0},
-      {0, 0, 1, 1, 0},
-      {0, 0, 0, 1, 0},
-      {0, 0, 0, 1, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //y
-      {0, 0, 0, 0, 0},
-      {0, 0, 0, 1, 0},
-      {0, 1, 1, 1, 1},
-      {0, 0, 0, 0, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //y
-      {0, 0, 1, 0, 0},
-      {0, 0, 1, 0, 0},
-      {0, 0, 1, 1, 0},
-      {0, 0, 1, 0, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //y
-      {0, 0, 0, 0, 0},
-      {0, 1, 1, 1, 1},
-      {0, 0, 1, 0, 0},
-      {0, 0, 0, 0, 0}
-      }
-    },
-    {
-      {
-      {0, 0, 0, 0, 0}, //reverse y
-      {0, 0, 1, 0, 0},
-      {0, 0, 1, 1, 0},
-      {0, 0, 1, 0, 0},
-      {0, 0, 1, 0, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //reverse y
-      {0, 0, 0, 0, 0},
-      {0, 1, 1, 1, 1},
-      {0, 0, 0, 1, 0},
-      {0, 0, 0, 0, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //reverse y
-      {0, 0, 0, 1, 0},
-      {0, 0, 0, 1, 0},
-      {0, 0, 1, 1, 0},
-      {0, 0, 0, 1, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //reverse y
-      {0, 0, 0, 0, 0},
-      {0, 0, 1, 0, 0},
-      {0, 1, 1, 1, 1},
-      {0, 0, 0, 0, 0}
-      }
-    },
-    {
-      {
-      {0, 0, 0, 0, 0}, //s
-      {0, 0, 1, 1, 0},
-      {0, 0, 1, 0, 0},
-      {0, 1, 1, 0, 0},
-      {0, 0, 0, 0, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //s
-      {0, 1, 0, 0, 0},
-      {0, 1, 1, 1, 0},
-      {0, 0, 0, 1, 0},
-      {0, 0, 0, 0, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //s
-      {0, 0, 1, 1, 0},
-      {0, 0, 1, 0, 0},
-      {0, 1, 1, 0, 0},
-      {0, 0, 0, 0, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //s
-      {0, 1, 0, 0, 0},
-      {0, 1, 1, 1, 0},
-      {0, 0, 0, 1, 0},
-      {0, 0, 0, 0, 0}
-      }
-    },
-    {
-      {
-      {0, 0, 0, 0, 0}, //z
-      {0, 1, 1, 0, 0},
-      {0, 0, 1, 0, 0},
-      {0, 0, 1, 1, 0},
-      {0, 0, 0, 0, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //z
-      {0, 0, 0, 1, 0},
-      {0, 1, 1, 1, 0},
-      {0, 1, 0, 0, 0},
-      {0, 0, 0, 0, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //z
-      {0, 1, 1, 0, 0},
-      {0, 0, 1, 0, 0},
-      {0, 0, 1, 1, 0},
-      {0, 0, 0, 0, 0}
-      },
-      {
-      {0, 0, 0, 0, 0}, //z
-      {0, 0, 0, 1, 0},
-      {0, 1, 1, 1, 0},
-      {0, 1, 0, 0, 0},
-      {0, 0, 0, 0, 0}
+      {0, 0, 0, 0},
+      {0, 0, 1, 0}, //T
+      {0, 0, 1, 1},
+      {0, 0, 1, 0}
       }
     }
   };
@@ -620,38 +276,51 @@ int main(){
               init(&world[0][0], &level, &lines, &timer, &rand, &dead);
               newPiece(&piece_x, &piece_y, &piece_color, &piece_rotation, &piece_type, &rand);
               break;
+            case SDLK_m:
+              mute = !mute;
+              break;
 
             case SDLK_RIGHT:
-              piece_x++;
-              if(collition(piece_x, piece_y, piece, world))
-                piece_x--;
+              if(!dead){
+                piece_x++;
+                if(collition(piece_x, piece_y, piece, world))
+                  piece_x--;
+              }
               break;
             case SDLK_LEFT:
-              piece_x--;
-              if(collition(piece_x, piece_y, piece, world))
-                piece_x++;
+              if(!dead){
+                piece_x--;
+                if(collition(piece_x, piece_y, piece, world))
+                  piece_x++;
+              }
               break;
             case SDLK_DOWN:
-              piece_y++;
-              if(collition(piece_x, piece_y, piece, world)){
-                piece_y--;
-                setPiece(piece, &world, piece_x, piece_y, piece_color, &dead, &level, &lines);
-                newPiece(&piece_x, &piece_y, &piece_color, &piece_rotation, &piece_type, &rand);
-                if(collition(piece_x, piece_y, piece, world))
-                  dead = true;
-                updatePiece(piece_rotation, piece_type, &piece, pieces);
+              if(!dead){
+                piece_y++;
+                if(collition(piece_x, piece_y, piece, world)){
+                  piece_y--;
+                  setPiece(piece, &world, piece_x, piece_y, piece_color, &level, &lines);
+                  newPiece(&piece_x, &piece_y, &piece_color, &piece_rotation, &piece_type, &rand);
+                  if(collition(piece_x, piece_y, piece, world))
+                    dead = true;
+                  updatePiece(piece_rotation, piece_type, &piece, pieces);
+                }
               }
               break;
             case SDLK_z:
-              rotateLeft(&piece_rotation, piece_type, &piece, pieces);
-              if(collition(piece_x, piece_y, piece, world))
-                rotateRight(&piece_rotation, piece_type, &piece, pieces);
-            break;
-            case SDLK_x:
-              rotateRight(&piece_rotation, piece_type, &piece, pieces);
-              if(collition(piece_x, piece_y, piece, world))
+              if(!dead){
                 rotateLeft(&piece_rotation, piece_type, &piece, pieces);
-            break;
+                if(collition(piece_x, piece_y, piece, world))
+                  rotateRight(&piece_rotation, piece_type, &piece, pieces);
+              }
+              break;
+            case SDLK_x:
+              if(!dead){
+                rotateRight(&piece_rotation, piece_type, &piece, pieces);
+                if(collition(piece_x, piece_y, piece, world))
+                  rotateLeft(&piece_rotation, piece_type, &piece, pieces);
+              }
+              break;
 
             /*
             case SDLK_a:
@@ -675,7 +344,7 @@ int main(){
           piece_y++;
           if(collition(piece_x, piece_y, piece, world)){
             piece_y--;
-            setPiece(piece, &world, piece_x, piece_y, piece_color, &dead, &level, &lines);
+            setPiece(piece, &world, piece_x, piece_y, piece_color, &level, &lines);
             newPiece(&piece_x, &piece_y, &piece_color, &piece_rotation, &piece_type, &rand);
             if(collition(piece_x, piece_y, piece, world))
               dead = true;
@@ -683,8 +352,20 @@ int main(){
           }
           timer = 0;
         }
+
+        if(mute)
+          SDL_PauseAudioDevice(deviceId, 1);
+        else if(SDL_GetAudioDeviceStatus(deviceId) != SDL_AUDIO_PLAYING)
+          SDL_PauseAudioDevice(deviceId, 0);
       }
+      else
+        if(SDL_GetAudioDeviceStatus(deviceId) == SDL_AUDIO_PLAYING)
+          SDL_PauseAudioDevice(deviceId, 1);
       time_old = SDL_GetTicks();
+    }
+    if(SDL_GetQueuedAudioSize(deviceId) == 0){
+      SDL_QueueAudio(deviceId, wavBuffer, wavLength);
+      SDL_PauseAudioDevice(deviceId, 0);
     }
     
 
@@ -711,45 +392,11 @@ int main(){
       for(int i = 0; i < WORLD_WIDTH; i++){
         temp_rect.x = off_x + (i * BLOCK_SIDE);
         temp_rect.y = off_y + (j * BLOCK_SIDE);
-        switch(world[j][i]){
-          case 1:
-            SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
-            break;
-          case 2:
-            SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
-            break;
-          case 3:
-            SDL_SetRenderDrawColor(renderer, 255, 0, 255, 255);
-            break;
-          case 4:
-            SDL_SetRenderDrawColor(renderer, 0, 255, 255, 255);
-            break;
-          case 5:
-            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-            break;
-          default:
-            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-        }
+        setColor(renderer, world[j][i]);
         SDL_RenderFillRect(renderer, &temp_rect);
       }
 
-    switch(piece_color){
-      case 1:
-        SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
-        break;
-      case 2:
-        SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
-        break;
-      case 3:
-        SDL_SetRenderDrawColor(renderer, 255, 0, 255, 255);
-        break;
-      case 4:
-        SDL_SetRenderDrawColor(renderer, 0, 255, 255, 255);
-        break;
-      case 5:
-        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-        break;
-    }
+    setColor(renderer, piece_color);
     for(int j = 0; j < PIECE_MAX_SIZE; j++)
       for(int i = 0; i < PIECE_MAX_SIZE; i++){
         if(piece[j][i]){
@@ -758,13 +405,16 @@ int main(){
           SDL_RenderFillRect(renderer, &temp_rect);
         }
       }
-    renderNumber(renderer, font, level, off_x + (WORLD_WIDTH + 12) * BLOCK_SIDE, off_y);
-    renderNumber(renderer, font, (level * BLOCK_SIDE) + lines, off_x + (WORLD_WIDTH + 12) * BLOCK_SIDE, off_y + (WORLD_HEIGHT * 2));
+    renderNumber(renderer, font, level, off_x + (WORLD_WIDTH + 13) * BLOCK_SIDE, off_y);
+    renderNumber(renderer, font, (level * BLOCK_SIDE) + lines, off_x + (WORLD_WIDTH + 13) * BLOCK_SIDE, off_y + (WORLD_HEIGHT * 2));
 
     SDL_RenderPresent(renderer);
   }
 
   //end
+  SDL_CloseAudioDevice(deviceId);
+  SDL_FreeWAV(wavBuffer);
+  SDL_Quit();
 
   return 0;
 }
@@ -796,7 +446,7 @@ void newPiece(int *piece_x, int *piece_y, int *piece_color, int *piece_rotation,
   *piece_y = 0;
   *piece_rotation = 0;
   random(rand);
-  *piece_color = (unsigned int)*rand % 5;
+  *piece_color = (unsigned int)*rand % COLOR_VARIATIONS;
   *piece_color += 1;
   random(rand);
   *piece_type = (unsigned int)*rand % PIECE_VARIATIONS;
@@ -859,14 +509,11 @@ bool collition(int piece_x, int piece_y, bool piece[PIECE_MAX_SIZE][PIECE_MAX_SI
   return res;
 }
 
-void setPiece(bool piece[PIECE_MAX_SIZE][PIECE_MAX_SIZE], int (*world)[WORLD_HEIGHT][WORLD_WIDTH], int piece_x, int piece_y, int piece_color, bool *dead, int *level, int *lines){
+void setPiece(bool piece[PIECE_MAX_SIZE][PIECE_MAX_SIZE], int (*world)[WORLD_HEIGHT][WORLD_WIDTH], int piece_x, int piece_y, int piece_color, int *level, int *lines){
   for(int j = 0; j < PIECE_MAX_SIZE; j++)
     for(int i = 0; i < PIECE_MAX_SIZE; i++)
-      if(piece[j][i]){
-        if(piece_y + j == 0)
-          *dead = true;
+      if(piece[j][i])
         (*world)[piece_y + j][piece_x + i] = piece_color;
-      }
 
   bool line;
   for(int j = 1; j < WORLD_HEIGHT; j++){
@@ -912,4 +559,60 @@ void renderNumber(SDL_Renderer *renderer, SDL_Texture *font, int num, int x, int
     temp_x -= BLOCK_SIDE;
   }
   while(num != 0);
+}
+
+
+void setColor(SDL_Renderer *renderer, int id){
+  switch(id){
+    case 1:
+      SDL_SetRenderDrawColor(renderer, 0, 0, 128, 255);
+      break;
+    case 2:
+      SDL_SetRenderDrawColor(renderer, 0, 0, 192, 255);
+      break;
+    case 3:
+      SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
+      break;
+    case 4:
+      SDL_SetRenderDrawColor(renderer, 0, 128, 0, 255);
+      break;
+    case 5:
+      SDL_SetRenderDrawColor(renderer, 0, 192, 0, 255);
+      break;
+    case 6:
+      SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+      break;
+    case 7:
+      SDL_SetRenderDrawColor(renderer, 128, 0, 0, 255);
+      break;
+    case 8:
+      SDL_SetRenderDrawColor(renderer, 192, 0, 0, 255);
+      break;
+    case 9:
+      SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+      break;
+    case 10:
+      SDL_SetRenderDrawColor(renderer, 128, 0, 128, 255);
+      break;
+    case 11:
+      SDL_SetRenderDrawColor(renderer, 192, 0, 192, 255);
+      break;
+    case 12:
+      SDL_SetRenderDrawColor(renderer, 255, 0, 255, 255);
+      break;
+    case 13:
+      SDL_SetRenderDrawColor(renderer, 0, 128, 128, 255);
+      break;
+    case 14:
+      SDL_SetRenderDrawColor(renderer, 0, 192, 192, 255);
+      break;
+    case 15:
+      SDL_SetRenderDrawColor(renderer, 0, 255, 255, 255);
+      break;
+    case 16:
+      SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+      break;
+    default:
+      SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+  }
 }
