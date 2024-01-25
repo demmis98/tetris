@@ -64,7 +64,7 @@ int main(){
 
   int piece_x, piece_y, piece_color, piece_rotation, piece_type;
   int level, lines, timer;
-  bool dead, mute = false;
+  bool dead, mute = false, pause = false;
 
   bool piece[PIECE_MAX_SIZE][PIECE_MAX_SIZE];
 
@@ -280,23 +280,26 @@ int main(){
             case SDLK_m:
               mute = !mute;
               break;
+            case SDLK_p:
+              pause = !pause;
+              break;
 
             case SDLK_RIGHT:
-              if(!dead){
+              if(!dead && !pause){
                 piece_x++;
                 if(collition(piece_x, piece_y, piece, world))
                   piece_x--;
               }
               break;
             case SDLK_LEFT:
-              if(!dead){
+              if(!dead && !pause){
                 piece_x--;
                 if(collition(piece_x, piece_y, piece, world))
                   piece_x++;
               }
               break;
             case SDLK_DOWN:
-              if(!dead){
+              if(!dead && !pause){
                 piece_y++;
                 if(collition(piece_x, piece_y, piece, world)){
                   piece_y--;
@@ -309,14 +312,14 @@ int main(){
               }
               break;
             case SDLK_z:
-              if(!dead){
+              if(!dead && !pause){
                 rotateLeft(&piece_rotation, piece_type, &piece, pieces);
                 if(collition(piece_x, piece_y, piece, world))
                   rotateRight(&piece_rotation, piece_type, &piece, pieces);
               }
               break;
             case SDLK_x:
-              if(!dead){
+              if(!dead && !pause){
                 rotateRight(&piece_rotation, piece_type, &piece, pieces);
                 if(collition(piece_x, piece_y, piece, world))
                   rotateLeft(&piece_rotation, piece_type, &piece, pieces);
@@ -339,7 +342,7 @@ int main(){
 
     time_new = SDL_GetTicks();
     if(time_new - time_old > 1000/60){
-      if(!dead){
+      if(!dead && !pause){
         timer++;
         if((timer == 60 - level && level < 60) || level >= 60){
           piece_y++;
