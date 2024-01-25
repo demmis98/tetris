@@ -275,6 +275,7 @@ int main(){
             case SDLK_r:
               init(&world[0][0], &level, &lines, &timer, &rand, &dead);
               newPiece(&piece_x, &piece_y, &piece_color, &piece_rotation, &piece_type, &rand);
+              updatePiece(piece_rotation, piece_type, &piece, pieces);
               break;
             case SDLK_m:
               mute = !mute;
