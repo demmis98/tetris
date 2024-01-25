@@ -11,3 +11,6 @@ rotar pieza en sentido antihorario:
 
 resetear:
   -r
+
+mutear:
+  -m
