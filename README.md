@@ -14,3 +14,6 @@ resetear:
 
 mutear:
   -m
+
+pausar:
+  -p
